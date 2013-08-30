@@ -3,14 +3,15 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"log"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
 	"path"
 	"sync"
+	"time"
 )
 
 func extForLanguage(lang string) string {
@@ -155,6 +156,12 @@ func (s *Server) eventStreamHandler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			f.Flush()
+		case <-time.After(1e9 * 15):
+			if _, err := fmt.Fprintf(w, ":keepalive\n\n"); err != nil {
+				log.Println("Connection not writeable")
+				return
+			}
+			f.Flush()
 		case <-closer:
 			log.Println("Connection closed")
 			return
@@ -169,4 +176,3 @@ func main() {
 	http.HandleFunc("/event-stream/", s.eventStreamHandler)
 	http.ListenAndServe(":8080", nil)
 }
-
