@@ -12,10 +12,17 @@ $(function() {
   var langBox = $('#language');
   var lang = langBox.val();
 
+  var output = [];
+
   var runCode = function() {
+    $('#console').text('');
+    output = [];
     var params = { body: editor.getValue(), language: lang };
-    $.post('/api/', params, function(data) {
-      $('#console').text(data);
+    var start = new Date();
+    $.post('/api/run-code/', params, function(data) {
+      var msg = " -> Completed in " + (new Date() - start) / 1000 + "s";
+      output.push(msg)/
+      $('#console').text(output.join('\n'));
     });
   }
 
@@ -37,5 +44,11 @@ $(function() {
   });
 
   $('#run').on('click', runCode);
+
+  var evtSource = new EventSource("/api/event-stream/");
+  evtSource.onmessage = function(e) {
+    output.push(e.data);
+    $('#console').text(output.join('\n'));
+  }
 });
 

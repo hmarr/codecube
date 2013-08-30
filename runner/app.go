@@ -1,15 +1,15 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"os/exec"
 	"path"
 	"sync"
-	"io"
-	"bufio"
 )
 
 func extForLanguage(lang string) string {
@@ -26,19 +26,22 @@ func extForLanguage(lang string) string {
 	return ""
 }
 
-func streamOutput(stream io.ReadCloser, w http.ResponseWriter, wg *sync.WaitGroup) {
+func (s *Server) streamOutput(stream io.ReadCloser, wg *sync.WaitGroup) {
 	scanner := bufio.NewScanner(stream)
 	for scanner.Scan() {
-		w.Write([]byte(scanner.Text() + "\n"))
+		fmt.Println("Dispatching to test:")
+		text := scanner.Text()
+		s.broker.Dispatch("test", Event{text})
 	}
 	if err := scanner.Err(); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		// TODO: oops!
+		//http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
 	wg.Done()
 }
 
-func handler(w http.ResponseWriter, r *http.Request) {
+func (s *Server) runCodeHandler(w http.ResponseWriter, r *http.Request) {
 	language := r.FormValue("language")
 	body := r.FormValue("body")
 
@@ -97,7 +100,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	// Cmd.Wait() closes the fds, so we need to wait for reading to finish first
 	var wg sync.WaitGroup
 	wg.Add(1)
-	go streamOutput(stdout, w, &wg)
+	go s.streamOutput(stdout, &wg)
 	//go streamOutput(stderr, w, &wg)
 	wg.Wait()
 
@@ -107,8 +110,59 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+type Server struct {
+	broker *Broker
+}
+
+func (s *Server) eventStreamHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("New SSE subscriber")
+
+	f, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
+		return
+	}
+
+	c, ok := w.(http.CloseNotifier)
+	if !ok {
+		http.Error(w, "close notification unsupported", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no") // For Nginx
+
+	ch := s.broker.Subscribe("test")
+	defer func() {
+		fmt.Println("Cleaning up connection")
+		s.broker.Unsubscribe(ch, "test")
+	}()
+
+	closer := c.CloseNotify()
+
+	for {
+		select {
+		case e := <-ch:
+			fmt.Println("New SSE message", e.Body)
+			if _, err := fmt.Fprintf(w, "data: %s\n\n", e.Body); err != nil {
+				fmt.Println("Connection not writeable")
+				return
+			}
+			f.Flush()
+		case <-closer:
+			fmt.Println("Connection closed")
+			return
+		}
+	}
+	fmt.Println("SSE done")
+}
+
 func main() {
-	http.HandleFunc("/", handler)
+	s := &Server{broker: NewBroker()}
+	http.HandleFunc("/run-code/", s.runCodeHandler)
+	http.HandleFunc("/event-stream/", s.eventStreamHandler)
 	http.ListenAndServe(":8080", nil)
 }
 
