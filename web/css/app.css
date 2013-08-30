@@ -1,0 +1,31 @@
+#toolbar {
+  height: 40px;
+  width: 100%;
+  background: #fff;
+  font-family: Helvetica, sans-serif;
+  text-transform: uppercase;
+}
+
+#editor {
+  position: absolute;
+  top: 40px;
+  right: 50%;
+  bottom: 0;
+  left: 0;
+}
+
+#console {
+  position: absolute;
+  top: 40px;
+  left: 50%;
+  bottom: 0;
+  right: 0;
+  background: #222;
+  padding: 10px;
+  line-height: 1.1em;
+  color: #4f4;
+  white-space: pre-wrap;
+  font-family: Menlo, Monaco, monospace;
+  overflow: auto
+}
+

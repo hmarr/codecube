@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>CodeCube</title>
+  <link rel="stylesheet" href="/css/app.css" />
+</head>
+<body>
+  <div id="toolbar">
+    <strong>CodeCube</strong>
+    <button id="run">Run</button>
+    <select id="language">
+      <option value="c">C</option>
+      <option value="golang">Go</option>
+      <option value="python">Python</option>
+      <option value="ruby">Ruby</option>
+    </select>
+  </div>
+  <div id="editor"></div>
+  <div id="console"></div>
+
+  <script src="/vendor/jquery.min.js"></script>
+  <script src="/vendor/ace/ace.js" charset="utf-8"></script>
+  <script src="/js/app.js"></script>
+</body>
+</html>
