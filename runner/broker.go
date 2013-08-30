@@ -23,17 +23,18 @@ func (b *Broker) Subscribe(topic string) chan Event {
 
 	// If the topic doesn't exist, create it
 	b.Lock()
+	defer b.Unlock()
 	if _, exists := b.topics[topic]; !exists {
 		b.topics[topic] = list.New()
 	}
 	b.topics[topic].PushBack(ch)
-	b.Unlock()
 
 	return ch
 }
 
 func (b *Broker) Unsubscribe(ch chan Event, topic string) {
 	b.Lock()
+	defer b.Unlock()
 	if clients, exists := b.topics[topic]; exists {
 		// Find and remove the chan from the topic's client list
 		var next *list.Element
@@ -50,11 +51,11 @@ func (b *Broker) Unsubscribe(ch chan Event, topic string) {
 			delete(b.topics, topic)
 		}
 	}
-	b.Unlock()
 }
 
 func (b *Broker) Dispatch(topic string, event Event) {
 	b.RLock()
+	defer b.RUnlock()
 	if clients, exists := b.topics[topic]; exists {
 		var next *list.Element
 		for e := clients.Front(); e != nil; e = next {
@@ -63,6 +64,5 @@ func (b *Broker) Dispatch(topic string, event Event) {
 			ch <- event
 		}
 	}
-	b.RUnlock()
 }
 
