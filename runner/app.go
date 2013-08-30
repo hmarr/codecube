@@ -110,6 +110,8 @@ func (s *Server) runCodeHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	s.broker.Dispatch("test", Event{"--> Execution complete"})
 }
 
 type Server struct {

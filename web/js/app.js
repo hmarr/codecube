@@ -19,11 +19,7 @@ $(function() {
     output = [];
     var params = { body: editor.getValue(), language: lang };
     var start = new Date();
-    $.post('/api/run-code/', params, function(data) {
-      var msg = " -> Completed in " + (new Date() - start) / 1000 + "s";
-      output.push(msg)/
-      $('#console').text(output.join('\n'));
-    });
+    $.post('/api/run-code/', params);
   }
 
   var updateLanguage = function() {
