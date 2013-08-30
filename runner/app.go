@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"log"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -29,7 +30,7 @@ func extForLanguage(lang string) string {
 func (s *Server) streamOutput(stream io.ReadCloser, wg *sync.WaitGroup) {
 	scanner := bufio.NewScanner(stream)
 	for scanner.Scan() {
-		fmt.Println("Dispatching to test:")
+		log.Println("Dispatching to test:")
 		text := scanner.Text()
 		s.broker.Dispatch("test", Event{text})
 	}
@@ -45,7 +46,7 @@ func (s *Server) runCodeHandler(w http.ResponseWriter, r *http.Request) {
 	language := r.FormValue("language")
 	body := r.FormValue("body")
 
-	fmt.Printf("Running %s program...\n", language)
+	log.Printf("Running %s program...\n", language)
 
 	ext := extForLanguage(language)
 	fileName := fmt.Sprintf("prog.%s", ext)
@@ -71,6 +72,7 @@ func (s *Server) runCodeHandler(w http.ResponseWriter, r *http.Request) {
 	dockerArgs := []string{
 		"docker",
 		"run",
+		"-n=false",
 		fmt.Sprintf("-v=%s:/code:ro", dir),
 		"runner",
 		language,
@@ -92,7 +94,7 @@ func (s *Server) runCodeHandler(w http.ResponseWriter, r *http.Request) {
 	//}
 
 	if err := cmd.Start(); err != nil {
-		fmt.Printf("Error starting docker: %v\n", err)
+		log.Printf("Error starting docker: %v\n", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -115,7 +117,7 @@ type Server struct {
 }
 
 func (s *Server) eventStreamHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("New SSE subscriber")
+	log.Println("New SSE subscriber")
 
 	f, ok := w.(http.Flusher)
 	if !ok {
@@ -136,7 +138,7 @@ func (s *Server) eventStreamHandler(w http.ResponseWriter, r *http.Request) {
 
 	ch := s.broker.Subscribe("test")
 	defer func() {
-		fmt.Println("Cleaning up connection")
+		log.Println("Cleaning up connection")
 		s.broker.Unsubscribe(ch, "test")
 	}()
 
@@ -145,18 +147,18 @@ func (s *Server) eventStreamHandler(w http.ResponseWriter, r *http.Request) {
 	for {
 		select {
 		case e := <-ch:
-			fmt.Println("New SSE message", e.Body)
+			log.Println("New SSE message", e.Body)
 			if _, err := fmt.Fprintf(w, "data: %s\n\n", e.Body); err != nil {
-				fmt.Println("Connection not writeable")
+				log.Println("Connection not writeable")
 				return
 			}
 			f.Flush()
 		case <-closer:
-			fmt.Println("Connection closed")
+			log.Println("Connection closed")
 			return
 		}
 	}
-	fmt.Println("SSE done")
+	log.Println("SSE done")
 }
 
 func main() {

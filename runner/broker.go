@@ -10,7 +10,6 @@ type Event struct {
 }
 
 type Broker struct {
-	//clients map[chan Event]string
 	topics map[string]*list.List
 	sync.RWMutex
 }
