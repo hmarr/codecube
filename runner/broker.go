@@ -18,7 +18,7 @@ func NewBroker() *Broker {
 	return &Broker{topics: make(map[string]*list.List)}
 }
 
-func (b *Broker) Subscribe(topic string) chan Event {
+func (b *Broker) Subscribe(topic string) <-chan Event {
 	ch := make(chan Event)
 
 	// If the topic doesn't exist, create it
@@ -32,7 +32,7 @@ func (b *Broker) Subscribe(topic string) chan Event {
 	return ch
 }
 
-func (b *Broker) Unsubscribe(ch chan Event, topic string) {
+func (b *Broker) Unsubscribe(ch <-chan Event, topic string) {
 	b.Lock()
 	defer b.Unlock()
 	if clients, exists := b.topics[topic]; exists {

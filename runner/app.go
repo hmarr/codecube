@@ -121,6 +121,7 @@ type Server struct {
 
 func (s *Server) eventStreamHandler(w http.ResponseWriter, r *http.Request) {
 	log.Println("New SSE subscriber")
+	log.Println(r.URL.Path[1])
 
 	f, ok := w.(http.Flusher)
 	if !ok {
@@ -133,6 +134,7 @@ func (s *Server) eventStreamHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "close notification unsupported", http.StatusInternalServerError)
 		return
 	}
+	closer := c.CloseNotify()
 
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
@@ -144,8 +146,6 @@ func (s *Server) eventStreamHandler(w http.ResponseWriter, r *http.Request) {
 		log.Println("Cleaning up connection")
 		s.broker.Unsubscribe(ch, "test")
 	}()
-
-	closer := c.CloseNotify()
 
 	for {
 		select {
@@ -169,6 +169,11 @@ func (s *Server) eventStreamHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Println("SSE done")
 }
+
+type SSEConnection struct {
+	w *http.ResponseWriter
+}
+
 
 func main() {
 	s := &Server{broker: NewBroker()}
