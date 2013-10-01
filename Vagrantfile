@@ -24,6 +24,11 @@ Vagrant::Config.run do |config|
     pkg_cmd << "apt-get update -qq; apt-get install -q -y python-software-properties; " \
       "add-apt-repository -y ppa:ubuntu-x-swat/r-lts-backport; " \
       "apt-get update -qq; apt-get install -q -y linux-image-3.8.0-19-generic; "
+
+    # Install golang 1.1
+    pkg_cmd << "add-apt-repository -y ppa:duh/golang; " \
+      "apt-get update -qq; sudo apt-get install -q -y golang; "
+
     # Add guest additions if local vbox VM
     is_vbox = true
     ARGV.each do |arg| is_vbox &&= !arg.downcase.start_with?("--provider") end
@@ -85,7 +90,7 @@ Vagrant::VERSION >= "1.1.0" and Vagrant.configure("2") do |config|
     config.vm.provider "virtualbox" do |v|
       v.customize ["modifyvm", :id, "--memory", "2048"]
     end
-    config.vm.synced_folder "runner/", "/srv/runner"
+    config.vm.synced_folder "./", "/app"
   end
 end
 
