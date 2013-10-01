@@ -11,15 +11,20 @@ $(function() {
 
   var langBox = $('#language');
   var lang = langBox.val();
+  var running = false;
 
   var output = [];
 
   var runCode = function() {
+    if (running) return;
+    running = true;
     $('#console').text('');
     output = [];
     var params = { body: editor.getValue(), language: lang };
     var start = new Date();
-    $.post('/api/run-code/', params);
+    $.post('/api/run-code/', params, function() {
+      running = false;
+    });
   }
 
   var updateLanguage = function() {
