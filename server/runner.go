@@ -103,6 +103,7 @@ func (r *Runner) createContainer(srcFile string) error {
 	volPathOpts := docker.NewPathOpts()
 	volPathOpts.Set("/code")
 	config := &docker.Config{
+		CpuShares:       1,
 		Tty:             true,
 		OpenStdin:       false,
 		Volumes:         volPathOpts,
