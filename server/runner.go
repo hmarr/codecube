@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"time"
+	"strconv"
 	"fmt"
 	"errors"
 	"github.com/dotcloud/docker"
@@ -20,6 +21,8 @@ type Runner struct {
 	Code        string
 	OutStream   io.Writer
 	ErrStream   io.Writer
+	Uid			int
+	UidPool     *UidPool
 	client		*dcli.Client
 }
 
@@ -28,30 +31,40 @@ const (
 	STATUS_TIMED_OUT = -1
 )
 
-func NewRunner(client *dcli.Client, language string, code string) *Runner {
-	return &Runner{Language: language, Code: code, client: client}
+func NewRunner(client *dcli.Client, lang string, code string) *Runner {
+	return &Runner{Language: lang, Code: code, client: client, Uid: 10000}
 }
 
 func (r *Runner) Run(timeout time.Duration) (int, error) {
 	log.Println("Creating code directory")
 	if err := r.createCodeDir(); err != nil {
-		return STATUS_SUCCESS, err
+		return 0, err
 	}
 
 	log.Println("Creating source file")
 	srcFile, err := r.createSrcFile()
 	if err != nil {
-		return STATUS_SUCCESS, err
+		return 0, err
+	}
+
+	if r.UidPool != nil {
+		log.Println("Reserving uid")
+		uid, err := r.UidPool.Reserve()
+		if err != nil {
+			return 0, err
+		}
+		log.Printf("Got uid %d\n", uid)
+		r.Uid = uid
 	}
 
 	log.Println("Creating container")
 	if err := r.createContainer(srcFile); err != nil {
-		return STATUS_SUCCESS, err
+		return 0, err
 	}
 
 	log.Println("Starting container")
 	if err := r.startContainer(); err != nil {
-		return STATUS_SUCCESS, err
+		return 0, err
 	}
 	defer r.cleanup()
 
@@ -102,13 +115,14 @@ func (r *Runner) createSrcFile() (string, error) {
 func (r *Runner) createContainer(srcFile string) error {
 	volPathOpts := docker.NewPathOpts()
 	volPathOpts.Set("/code")
+	uidStr := strconv.Itoa(r.Uid)
 	config := &docker.Config{
 		CpuShares:       1,
 		Memory:			 20e6,
 		Tty:             true,
 		OpenStdin:       false,
 		Volumes:         volPathOpts,
-		Cmd:             []string{path.Join("/code", srcFile)},
+		Cmd:             []string{path.Join("/code", srcFile), uidStr},
 		Image:           "runner",
 		NetworkDisabled: true,
 	}
@@ -167,6 +181,14 @@ func (r *Runner) cleanup() {
 	log.Println("Removing container")
 	if err := r.client.RemoveContainer(r.ContainerId); err != nil {
 		log.Printf("Couldn't remove container %s (%v)\n", r.ContainerId, err)
+	}
+
+	if r.UidPool != nil {
+		log.Println("Releasing uid")
+		if err := r.UidPool.Release(r.Uid); err != nil {
+			log.Printf("Couldn't release uid %d (%v)\n", r.Uid, err)
+		}
+		r.Uid = 0
 	}
 
 	log.Println("Removing code dir")

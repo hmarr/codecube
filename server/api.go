@@ -11,14 +11,15 @@ import (
 )
 
 func main() {
-	s := &Server{broker: NewBroker()}
+	s := &Server{broker: NewBroker(), uidPool: NewUidPool(20000, 25000)}
 	http.HandleFunc("/run-code/", s.runCodeHandler)
 	http.HandleFunc("/event-stream/", s.eventStreamHandler)
 	http.ListenAndServe(":8080", nil)
 }
 
 type Server struct {
-	broker *Broker
+	broker  *Broker
+	uidPool *UidPool
 }
 
 func (s *Server) streamOutput(streamName string, stream io.Reader) {
@@ -39,6 +40,7 @@ func (s *Server) runCodeHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Running %s program...\n", language)
 
 	runner := NewRunner(dockerClient(), language, code)
+	runner.UidPool = s.uidPool
 	outReader, outWriter := io.Pipe()
 	errReader, errWriter := io.Pipe()
 	runner.OutStream = outWriter

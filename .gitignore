@@ -3,4 +3,5 @@ sample-code
 TODO
 deploy.sh
 server/server
+server/server.test
 server/vendor
