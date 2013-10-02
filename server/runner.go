@@ -104,6 +104,7 @@ func (r *Runner) createContainer(srcFile string) error {
 	volPathOpts.Set("/code")
 	config := &docker.Config{
 		CpuShares:       1,
+		Memory:			 20e6,
 		Tty:             true,
 		OpenStdin:       false,
 		Volumes:         volPathOpts,
