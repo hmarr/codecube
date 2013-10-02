@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"time"
 	"fmt"
 	"errors"
 	"github.com/dotcloud/docker"
@@ -22,46 +23,53 @@ type Runner struct {
 	client		*dcli.Client
 }
 
+const (
+	STATUS_SUCCESS = 0
+	STATUS_TIMED_OUT = -1
+)
+
 func NewRunner(client *dcli.Client, language string, code string) *Runner {
 	return &Runner{Language: language, Code: code, client: client}
 }
 
-func (r *Runner) Run() error {
+func (r *Runner) Run(timeout time.Duration) (int, error) {
 	log.Println("Creating code directory")
 	if err := r.createCodeDir(); err != nil {
-		return err
+		return STATUS_SUCCESS, err
 	}
 
 	log.Println("Creating source file")
 	srcFile, err := r.createSrcFile()
 	if err != nil {
-		return err
+		return STATUS_SUCCESS, err
 	}
 
 	log.Println("Creating container")
 	if err := r.createContainer(srcFile); err != nil {
-		return err
+		return STATUS_SUCCESS, err
 	}
 
 	log.Println("Starting container")
 	if err := r.startContainer(); err != nil {
-		return err
+		return STATUS_SUCCESS, err
 	}
 	defer r.cleanup()
 
 	log.Println("Streaming container logs")
-	if err := r.streamLogs(); err != nil {
-		return err
-	}
+	go func() {
+		if err := r.streamLogs(); err != nil {
+			log.Println(err)
+		}
+	}()
 
 	log.Println("Waiting for container to finish")
-	if status, err := r.client.WaitContainer(r.ContainerId); err != nil {
-		return err
-	} else {
+	killed, status := r.waitForExit(timeout)
+	if killed {
 		log.Printf("Container exited with status %d\n", status)
+		return STATUS_TIMED_OUT, nil
 	}
 
-	return nil
+	return STATUS_SUCCESS, nil
 }
 
 func (r *Runner) createCodeDir() error {
@@ -125,6 +133,32 @@ func (r *Runner) startContainer() error {
 	return nil
 }
 
+func (r *Runner) waitForExit(timeoutMs time.Duration) (bool, int) {
+	statusChan := make(chan int)
+	go func() {
+		if status, err := r.client.WaitContainer(r.ContainerId); err != nil {
+			log.Println(err)
+		} else {
+			statusChan <- status
+		}
+	}()
+
+	killed := false
+	for {
+		select {
+		case status := <-statusChan:
+			log.Println("Container exited by itself")
+			return killed, status
+		case <-time.After(time.Millisecond * timeoutMs):
+			log.Println("Container timed out, killing")
+			if err := r.client.StopContainer(r.ContainerId, 0); err != nil {
+				log.Println(err)
+			}
+			killed = true
+		}
+	}
+}
+
 func (r *Runner) cleanup() {
 	log.Println("Removing container")
 	if err := r.client.RemoveContainer(r.ContainerId); err != nil {
@@ -144,8 +178,8 @@ func (r *Runner) streamLogs() error {
 
 	attachOpts := dcli.AttachToContainerOptions{
 		Container:    r.ContainerId,
-		OutputStream: r.OutStream,//os.Stdout,
-		ErrorStream:  r.ErrStream,//os.Stderr,
+		OutputStream: r.OutStream,
+		ErrorStream:  r.ErrStream,
 		Logs:         true,
 		Stream:       true,
 		Stdout:       true,

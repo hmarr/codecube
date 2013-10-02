@@ -48,16 +48,23 @@ func (s *Server) runCodeHandler(w http.ResponseWriter, r *http.Request) {
 	go s.streamOutput("stderr", errReader)
 
 	log.Println("Running code...")
-	if err := runner.Run(); err != nil {
+	status, err := runner.Run(10000)
+	if err != nil {
 		log.Printf("[E] Error running code: %s\n", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
+	var msg string
+	if status == STATUS_TIMED_OUT {
+		msg = "=> timed out after 10s"
+	} else {
+		msg = fmt.Sprintf("=> exited with status %d", status)
+	}
+	s.broker.Dispatch("test", Event{msg})
+
 	outReader.Close()
 	errReader.Close()
-
-	s.broker.Dispatch("test", Event{"--> Execution complete"})
 }
 
 func (s *Server) eventStreamHandler(w http.ResponseWriter, r *http.Request) {

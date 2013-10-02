@@ -31,7 +31,7 @@ func notmain() {
 	go tailOutput("stderr", errReader)
 
 	log.Println("Running code...")
-	if err := runner.Run(); err != nil {
+	if _, err := runner.Run(10000); err != nil {
 	    panic(err)
 	}
 
