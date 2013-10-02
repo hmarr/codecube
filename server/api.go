@@ -1,43 +1,103 @@
 package main
 
 import (
+	"bufio"
+	"encoding/json"
 	"fmt"
+	dcli "github.com/fsouza/go-dockerclient"
+	"github.com/garyburd/redigo/redis"
+	"io"
 	"log"
 	"net/http"
-	"io"
-	"bufio"
 	"time"
-	dcli "github.com/fsouza/go-dockerclient"
 )
 
 func main() {
-	s := &Server{broker: NewBroker(), uidPool: NewUidPool(20000, 25000)}
-	http.HandleFunc("/run-code/", s.runCodeHandler)
+	redisPool := redis.NewPool(func() (redis.Conn, error) {
+		return redis.Dial("tcp", ":6379")
+	}, 5)
+
+	s := &Server{
+		broker:    NewBroker(),
+		uidPool:   NewUidPool(20000, 25000),
+		redisPool: redisPool,
+	}
+	http.HandleFunc("/run-snippet/", s.runSnippetHandler)
+	http.HandleFunc("/load-snippet/", s.loadSnippetHandler)
 	http.HandleFunc("/event-stream/", s.eventStreamHandler)
 	http.ListenAndServe(":8080", nil)
 }
 
 type Server struct {
-	broker  *Broker
-	uidPool *UidPool
+	broker    *Broker
+	uidPool   *UidPool
+	redisPool *redis.Pool
 }
 
-func (s *Server) streamOutput(streamName string, stream io.Reader) {
+type Snippet struct {
+	Language string `json:"language"`
+	Code     string `json:"code"`
+}
+
+func (s *Server) saveSnippet(id string, sn *Snippet) error {
+	conn := s.redisPool.Get()
+	defer conn.Close()
+
+	_, err := conn.Do("SET", fmt.Sprintf("cc:language:%s", id), sn.Language)
+	if err != nil {
+		return err
+	}
+
+	_, err = conn.Do("SET", fmt.Sprintf("cc:code:%s", id), sn.Code)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *Server) loadSnippet(id string) (*Snippet, error) {
+	conn := s.redisPool.Get()
+	defer conn.Close()
+
+	key := fmt.Sprintf("cc:language:%s", id)
+	language, err := redis.String(conn.Do("GET", key))
+	if err != nil {
+		return nil, err
+	}
+
+	key = fmt.Sprintf("cc:code:%s", id)
+	code, err := redis.String(conn.Do("GET", key))
+	if err != nil {
+		return nil, err
+	}
+
+	return &Snippet{Language: language, Code: code}, nil
+}
+
+func (s *Server) streamOutput(id string, streamName string, stream io.Reader) {
 	scanner := bufio.NewScanner(stream)
 	for scanner.Scan() {
 		text := scanner.Text()
-		s.broker.Dispatch("test", Event{text})
+		s.broker.Dispatch(id, Event{text})
 	}
 	if err := scanner.Err(); err != nil {
 		// TODO: something?
 	}
 }
 
-func (s *Server) runCodeHandler(w http.ResponseWriter, r *http.Request) {
+func (s *Server) runSnippetHandler(w http.ResponseWriter, r *http.Request) {
+	id := r.FormValue("id")
 	language := r.FormValue("language")
-	code := r.FormValue("body")
+	code := r.FormValue("code")
 
-	log.Printf("Running %s program...\n", language)
+	log.Printf("Running code for id %s\n", id)
+	err := s.saveSnippet(id, &Snippet{Language: language, Code: code})
+	if err != nil {
+		log.Printf("[E] Error saving snippet %s: %s\n", id, err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	runner := NewRunner(dockerClient(), language, code)
 	runner.UidPool = s.uidPool
@@ -46,8 +106,8 @@ func (s *Server) runCodeHandler(w http.ResponseWriter, r *http.Request) {
 	runner.OutStream = outWriter
 	runner.ErrStream = errWriter
 
-	go s.streamOutput("stdout", outReader)
-	go s.streamOutput("stderr", errReader)
+	go s.streamOutput(id, "stdout", outReader)
+	go s.streamOutput(id, "stderr", errReader)
 
 	log.Println("Running code...")
 	status, err := runner.Run(10000)
@@ -63,25 +123,48 @@ func (s *Server) runCodeHandler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		msg = fmt.Sprintf("=> exited with status %d", status)
 	}
-	s.broker.Dispatch("test", Event{msg})
+	s.broker.Dispatch(id, Event{msg})
 
 	outReader.Close()
 	errReader.Close()
 }
 
+func (s *Server) loadSnippetHandler(w http.ResponseWriter, r *http.Request) {
+	var snippet *Snippet
+
+	id := r.FormValue("id")
+	if id != "" {
+		snippet, _ = s.loadSnippet(string(id))
+	}
+
+	json, err := json.Marshal(snippet)
+	if err != nil {
+		log.Printf("[E] Error marshalling json: %s\n", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	fmt.Fprint(w, string(json))
+}
+
 func (s *Server) eventStreamHandler(w http.ResponseWriter, r *http.Request) {
-	log.Println("New SSE subscriber")
-	log.Println(r.URL.Path[1])
+	id := r.FormValue("id")
+	log.Printf("New SSE subscriber (%s)\n", id)
+
+	if id == "" {
+		http.Error(w, "id can't be blank", http.StatusBadRequest)
+		return
+	}
 
 	f, ok := w.(http.Flusher)
 	if !ok {
-		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
+		http.Error(w, "streaming unsupported", http.StatusBadRequest)
 		return
 	}
 
 	c, ok := w.(http.CloseNotifier)
 	if !ok {
-		http.Error(w, "close notification unsupported", http.StatusInternalServerError)
+		http.Error(w, "close notification unsupported", http.StatusBadRequest)
 		return
 	}
 	closer := c.CloseNotify()
@@ -91,10 +174,10 @@ func (s *Server) eventStreamHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("X-Accel-Buffering", "no") // For Nginx
 
-	ch := s.broker.Subscribe("test")
+	ch := s.broker.Subscribe(id)
 	defer func() {
 		log.Println("Cleaning up connection")
-		s.broker.Unsubscribe(ch, "test")
+		s.broker.Unsubscribe(ch, id)
 	}()
 
 	for {
@@ -127,4 +210,3 @@ func dockerClient() *dcli.Client {
 	}
 	return client
 }
-

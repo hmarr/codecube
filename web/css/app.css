@@ -26,6 +26,7 @@
   color: #4f4;
   white-space: pre-wrap;
   font-family: Menlo, Monaco, monospace;
+  font-size: 0.8em;
   overflow: auto
 }
 

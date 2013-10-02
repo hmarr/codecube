@@ -14,8 +14,9 @@ Runnable code snippets
    a tagged docker image that's ready for running code
 6. Set up quotas ([instructions here][1]), and `apt-get install quota`
 7. Build a pool of uids with quotas attached (`./set-quotas.sh`)
-8. Compile the go app with `go build .`
-9. Run the go app with a process manager (look at conf/upstart.conf for
+8. Install redis (`apt-get install redis-server`)
+9. Compile the go app with `go build .`
+10. Run the go app with a process manager (look at conf/upstart.conf for
    inspiration)
 
 [1]: https://www.digitalocean.com/community/articles/how-to-enable-user-quotas

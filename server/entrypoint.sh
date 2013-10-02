@@ -10,8 +10,7 @@ if [ -z $uid ]; then
   uid=10000
 fi
 
-echo "current uid: $UID"
-echo "desired uid: $uid"
+echo "127.0.0.1 $(hostname)" >> /etc/hosts
 
 groupadd code
 useradd -u "$uid" -G code -d "/home/codecube" -m codecube 
