@@ -118,7 +118,7 @@ func (r *Runner) createContainer(srcFile string) error {
 	uidStr := strconv.Itoa(r.Uid)
 	config := &docker.Config{
 		CpuShares:       1,
-		Memory:			 20e6,
+		Memory:			 50e6,
 		Tty:             true,
 		OpenStdin:       false,
 		Volumes:         volPathOpts,
