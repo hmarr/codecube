@@ -20,12 +20,6 @@ var generateId = function() {
 }
 
 $(function() {
-  var id = getId();
-  if (typeof id === undefined || id == "") {
-    id = generateId();
-    history.replaceState(null, null, '/' + id);
-  }
-
   var editor = ace.edit("editor");
   editor.setTheme("ace/theme/monokai");
 
@@ -33,10 +27,58 @@ $(function() {
   var lang = langBox.val();
   var running = false;
 
+  var updateLanguage = function() {
+    lang = langBox.val();
+    editor.getSession().setMode("ace/mode/" + aceMode(lang));
+  }
+
   var output = [];
+
+  var id = getId();
+
+  if (id == 'demo') {
+    editor.setValue([
+      '5.times do',
+      '  puts "Hello, world!"',
+      '  sleep 0.5',
+      'end'
+    ].join('\n'));
+    langBox.val('ruby');
+    editor.getSelection().clearSelection();
+    updateLanguage();
+    id = "";
+  }
+
+  var regenerateId = function() {
+    id = generateId();
+    history.replaceState(null, null, '/' + id);
+    owner = true;
+  };
+
+  if (typeof id === undefined || id == "") {
+    regenerateId();
+  }
+
+  var evtSource;
+  var reopenEventSource = function() {
+    if (evtSource) {
+      evtSource.close();
+    }
+
+    evtSource = new EventSource("/api/event-stream/?id=" + id);
+    evtSource.onmessage = function(e) {
+      output.push(e.data);
+      $('#console').text(output.join('\n'));
+    }
+  };
+  reopenEventSource();
+
+  var owner = true;
 
   $.post('/api/load-snippet/', { id: id }, function(data) {
     if (data) {
+      owner = false;
+
       langBox.val(data['language']);
       updateLanguage();
       editor.setValue(data['code']);
@@ -47,6 +89,12 @@ $(function() {
   var runCode = function() {
     if (running) return;
     running = true;
+
+    if (!owner) {
+      regenerateId();
+      reopenEventSource();
+    }
+
     $('#console').text('');
     output = [];
     var params = { id: id, code: editor.getValue(), language: lang };
@@ -54,11 +102,6 @@ $(function() {
     $.post('/api/run-snippet/', params, function() {
       running = false;
     });
-  }
-
-  var updateLanguage = function() {
-    lang = langBox.val();
-    editor.getSession().setMode("ace/mode/" + aceMode(lang));
   }
 
   langBox.on('change', updateLanguage);
@@ -77,11 +120,5 @@ $(function() {
   });
 
   $('#run').on('click', runCode);
-
-  var evtSource = new EventSource("/api/event-stream/?id=" + id);
-  evtSource.onmessage = function(e) {
-    output.push(e.data);
-    $('#console').text(output.join('\n'));
-  }
 });
 

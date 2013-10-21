@@ -6,7 +6,6 @@ html, body {
 #toolbar {
   width: 100%;
   background: #444;
-  color: #eee;
   font-family: "Helvetica Neue", Helvetica, sans-serif;
   padding: 10px;
   line-height: 24px;
@@ -19,9 +18,16 @@ html, body {
 
 #toolbar #tools select {
   width: 110px;
-  }
+}
+
+#toolbar #right {
+  position: absolute;
+  right: 12px;
+  top: 11px;
+}
 
 #toolbar h1 {
+  color: #eee;
   text-align: center;
   margin: 0 auto;
   font-size: 24px;
