@@ -1,22 +1,50 @@
+html, body {
+  padding: 0;
+  margin: 0;
+}
+
 #toolbar {
-  height: 40px;
   width: 100%;
-  background: #fff;
-  font-family: Helvetica, sans-serif;
-  text-transform: uppercase;
+  background: #444;
+  color: #eee;
+  font-family: "Helvetica Neue", Helvetica, sans-serif;
+  padding: 10px;
+  line-height: 24px;
+}
+
+#toolbar #tools {
+  position: absolute;
+  top: 7px;
+}
+
+#toolbar #tools select {
+  width: 110px;
+  }
+
+#toolbar h1 {
+  text-align: center;
+  margin: 0 auto;
+  font-size: 24px;
+  font-weight: 100;
+  letter-spacing: 1px;
 }
 
 #editor {
   position: absolute;
-  top: 40px;
+  top: 44px;
   right: 50%;
   bottom: 0;
   left: 0;
+  background: #000;
+}
+
+.ace_gutter {
+  background: #222 !important;
 }
 
 #console {
   position: absolute;
-  top: 40px;
+  top: 44px;
   left: 50%;
   bottom: 0;
   right: 0;

@@ -6,14 +6,16 @@
 </head>
 <body>
   <div id="toolbar">
-    <strong>CodeCube</strong>
-    <button id="run">Run</button>
-    <select id="language">
-      <option value="c">C</option>
-      <option value="golang">Go</option>
-      <option value="python">Python</option>
-      <option value="ruby">Ruby</option>
-    </select>
+    <div id="tools">
+      <select id="language">
+        <option value="c">C</option>
+        <option value="golang">Go</option>
+        <option value="python">Python</option>
+        <option value="ruby">Ruby</option>
+      </select>
+      <button id="run">Run</button>
+    </div>
+    <h1>codecube.io</h1>
   </div>
   <div id="editor"></div>
   <div id="console"></div>
@@ -21,5 +23,18 @@
   <script src="/vendor/jquery.min.js"></script>
   <script src="/vendor/ace/ace.js" charset="utf-8"></script>
   <script src="/js/app.js"></script>
+  <script type="text/javascript">
+    var _gauges = _gauges || [];
+    (function() {
+      var t   = document.createElement('script');
+      t.type  = 'text/javascript';
+      t.async = true;
+      t.id    = 'gauges-tracker';
+      t.setAttribute('data-site-id', '52652acef5a1f503e400000e');
+      t.src = '//secure.gaug.es/track.js';
+      var s = document.getElementsByTagName('script')[0];
+      s.parentNode.insertBefore(t, s);
+    })();
+  </script>
 </body>
 </html>
