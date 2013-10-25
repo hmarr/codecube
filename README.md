@@ -29,3 +29,5 @@ Runnable code snippets
   (e.g. switching language) to multiple clients, probably using SSE
 
 
+## License
+Licensed under the [MIT license](http://opensource.org/licenses/MIT).
