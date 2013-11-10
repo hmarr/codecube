@@ -224,6 +224,8 @@ func extForLanguage(lang string) (string, error) {
 		return "c", nil
 	case "golang":
 		return "go", nil
+	case "perl":
+		return "pl", nil
 	case "python":
 		return "py", nil
 	case "ruby":

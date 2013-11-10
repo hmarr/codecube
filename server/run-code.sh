@@ -18,6 +18,9 @@ case "$extension" in
   "go")
     go run $prog
     ;;
+  "pl")
+    perl $prog
+    ;;
   "py")
     python $prog
     ;;
